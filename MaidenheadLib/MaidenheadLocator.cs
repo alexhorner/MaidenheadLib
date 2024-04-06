@@ -8,6 +8,7 @@
 // Source: http://www.koders.com/perl/fidDAB6FD208AC4F5C0306CA344485FD0899BD2F328.aspx
 
 using System;
+using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
 namespace MaidenheadLib
@@ -232,6 +233,497 @@ namespace MaidenheadLib
 			if (az < 0) az = az + 2 * Math.PI;
 
 			return RadToDeg(az);
+		}
+		
+		private static readonly char[] Base18Ar = { 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R' };
+		private static readonly char[] Base24Ax = { 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X' };
+
+		private static int GetLastLocatorPart(string locator)
+		{
+			int? lastPart = null;
+
+			if (Regex.IsMatch(locator, "^[A-R]{2}[0-9]{2}$")) lastPart = 2;
+
+			if (Regex.IsMatch(locator, "^[A-R]{2}[0-9]{2}[A-X]{2}$")) lastPart = 3;
+
+			if (Regex.IsMatch(locator, "^[A-R]{2}[0-9]{2}[A-X]{2}[0-9]{2}$")) lastPart = 4;
+
+			if (Regex.IsMatch(locator, "^[A-R]{2}[0-9]{2}[A-X]{2}[0-9]{2}[A-X]{2}$")) lastPart = 5;
+			
+			if (lastPart is null) throw new FormatException("Invalid locator format");
+
+			return lastPart.Value;
+		}
+		
+		public static string LocatorShiftUp(string locator)
+		{
+			locator = locator.Trim().ToUpper();
+
+			int lastPart = GetLastLocatorPart(locator);
+			
+			char p1Long = locator[0]; //A-R
+			char p1Lat = locator[1]; //A-R
+			char p2Long = locator[2]; //0-9
+			char p2Lat = locator[3]; //0-9
+			char? p3Long = locator.Length >= 5 ? locator[4] : (char?)null; //A-X
+			char? p3Lat = locator.Length >= 5 ? locator[5] : (char?)null; //A-X
+			char? p4Long = locator.Length >= 7 ? locator[6] : (char?)null; //0-9
+			char? p4Lat =  locator.Length >= 7 ? locator[7] : (char?)null; //0-9
+			char? p5Long = locator.Length >= 9 ? locator[8] : (char?)null; //A-X
+			char? p5Lat = locator.Length >= 9 ? locator[9] : (char?)null; //A-X
+			
+			//Check P5
+			bool p5LatCarry = false;
+			
+			if (lastPart == 5)
+			{
+				//P5 increment
+				int p5LatInt = Array.IndexOf(Base24Ax, p5Lat) + 1;
+					
+				try
+				{
+					p5Lat = Base24Ax[p5LatInt];
+				}
+				catch (IndexOutOfRangeException)
+				{
+					p5Lat = Base24Ax[0];
+					p5LatCarry = true;
+				}
+			}
+			
+			//Check P4
+			bool p4LatCarry = false;
+			
+			if (lastPart == 4 || (lastPart > 4 && p5LatCarry))
+			{
+				//P4 increment
+				int p4LatInt = int.Parse(p4Lat.ToString()) + 1;
+
+				if (p4LatInt > 9)
+				{
+					p4Lat = '0';
+					p4LatCarry = true;
+				}
+				else
+				{
+					p4Lat = p4LatInt.ToString()[0];
+				}
+			}
+			
+			//Check P3
+			bool p3LatCarry = false;
+
+			if (lastPart == 3 || (lastPart > 3 && p4LatCarry))
+			{
+				//P3 increment
+				int p3LatInt = Array.IndexOf(Base24Ax, p3Lat) + 1;
+					
+				try
+				{
+					p3Lat = Base24Ax[p3LatInt];
+				}
+				catch (IndexOutOfRangeException)
+				{
+					p3Lat = Base24Ax[0];
+					p3LatCarry = true;
+				}
+			}
+			
+			//Check P2
+			bool p2LatCarry = false;
+
+			if (lastPart == 2 || (lastPart > 2 && p3LatCarry))
+			{
+				//P2 increment
+				int p2LatInt = int.Parse(p2Lat.ToString()) + 1;
+
+				if (p2LatInt > 9)
+				{
+					p2Lat = '0';
+					p2LatCarry = true;
+				}
+				else
+				{
+					p2Lat = p2LatInt.ToString()[0];
+				}
+			}
+				
+			//P1 carry from P2
+			if (p2LatCarry)
+			{
+				int p1LatInt = Array.IndexOf(Base18Ar, p1Lat) + 1;
+					
+				try
+				{
+					p1Lat = Base18Ar[p1LatInt];
+				}
+				catch (IndexOutOfRangeException)
+				{
+					p1Lat = Base18Ar[0];
+				}
+			}
+			
+			//Concatenate result
+			return $"{p1Long}{p1Lat}{p2Long}{p2Lat}{p3Long}{p3Lat}{p4Long}{p4Lat}{p5Long}{p5Lat}";
+		}
+
+		public static string LocatorShiftDown(string locator)
+		{
+			locator = locator.Trim().ToUpper();
+
+			int lastPart = GetLastLocatorPart(locator);
+			
+			char p1Long = locator[0]; //A-R
+			char p1Lat = locator[1]; //A-R
+			char p2Long = locator[2]; //0-9
+			char p2Lat = locator[3]; //0-9
+			char? p3Long = locator.Length >= 5 ? locator[4] : (char?)null; //A-X
+			char? p3Lat = locator.Length >= 5 ? locator[5] : (char?)null; //A-X
+			char? p4Long = locator.Length >= 7 ? locator[6] : (char?)null; //0-9
+			char? p4Lat =  locator.Length >= 7 ? locator[7] : (char?)null; //0-9
+			char? p5Long = locator.Length >= 9 ? locator[8] : (char?)null; //A-X
+			char? p5Lat = locator.Length >= 9 ? locator[9] : (char?)null; //A-X
+			
+			//Check P5
+			bool p5LatCarry = false;
+			
+			if (lastPart == 5)
+			{
+				//P5 decrement
+				int p5LatInt = Array.IndexOf(Base24Ax, p5Lat) - 1;
+					
+				try
+				{
+					p5Lat = Base24Ax[p5LatInt];
+				}
+				catch (IndexOutOfRangeException)
+				{
+					p5Lat = Base24Ax[23];
+					p5LatCarry = true;
+				}
+			}
+			
+			//Check P4
+			bool p4LatCarry = false;
+			
+			if (lastPart == 4 || (lastPart > 4 && p5LatCarry))
+			{
+				//P4 decrement
+				int p4LatInt = int.Parse(p4Lat.ToString()) - 1;
+
+				if (p4LatInt < 0)
+				{
+					p4Lat = '9';
+					p4LatCarry = true;
+				}
+				else
+				{
+					p4Lat = p4LatInt.ToString()[0];
+				}
+			}
+			
+			//Check P3
+			bool p3LatCarry = false;
+
+			if (lastPart == 3 || (lastPart > 3 && p4LatCarry))
+			{
+				//P3 decrement
+				int p3LatInt = Array.IndexOf(Base24Ax, p3Lat) - 1;
+					
+				try
+				{
+					p3Lat = Base24Ax[p3LatInt];
+				}
+				catch (IndexOutOfRangeException)
+				{
+					p3Lat = Base24Ax[23];
+					p3LatCarry = true;
+				}
+			}
+			
+			//Check P2
+			bool p2LatCarry = false;
+
+			if (lastPart == 2 || (lastPart > 2 && p3LatCarry))
+			{
+				//P2 increment
+				int p2LatInt = int.Parse(p2Lat.ToString()) - 1;
+
+				if (p2LatInt < 0)
+				{
+					p2Lat = '9';
+					p2LatCarry = true;
+				}
+				else
+				{
+					p2Lat = p2LatInt.ToString()[0];
+				}
+			}
+				
+			//P1 carry from P2
+			if (p2LatCarry)
+			{
+				int p1LatInt = Array.IndexOf(Base18Ar, p1Lat) - 1;
+					
+				try
+				{
+					p1Lat = Base18Ar[p1LatInt];
+				}
+				catch (IndexOutOfRangeException)
+				{
+					p1Lat = Base18Ar[17];
+				}
+			}
+			
+			//Concatenate result
+			return $"{p1Long}{p1Lat}{p2Long}{p2Lat}{p3Long}{p3Lat}{p4Long}{p4Lat}{p5Long}{p5Lat}";
+		}
+
+		public static string LocatorShiftLeft(string locator)
+		{
+			locator = locator.Trim().ToUpper();
+
+			int lastPart = GetLastLocatorPart(locator);
+			
+			char p1Long = locator[0]; //A-R
+			char p1Lat = locator[1]; //A-R
+			char p2Long = locator[2]; //0-9
+			char p2Lat = locator[3]; //0-9
+			char? p3Long = locator.Length >= 5 ? locator[4] : (char?)null; //A-X
+			char? p3Lat = locator.Length >= 5 ? locator[5] : (char?)null; //A-X
+			char? p4Long = locator.Length >= 7 ? locator[6] : (char?)null; //0-9
+			char? p4Lat =  locator.Length >= 7 ? locator[7] : (char?)null; //0-9
+			char? p5Long = locator.Length >= 9 ? locator[8] : (char?)null; //A-X
+			char? p5Lat = locator.Length >= 9 ? locator[9] : (char?)null; //A-X
+			
+			//Check P5
+			bool p5LongCarry = false;
+			
+			if (lastPart == 5)
+			{
+				//P5 increment
+				int p5LongInt = Array.IndexOf(Base24Ax, p5Long) - 1;
+					
+				try
+				{
+					p5Long = Base24Ax[p5LongInt];
+				}
+				catch (IndexOutOfRangeException)
+				{
+					p5Long = Base24Ax[23];
+					p5LongCarry = true;
+				}
+			}
+			
+			//Check P4
+			bool p4LongCarry = false;
+			
+			if (lastPart == 4 || (lastPart > 4 && p5LongCarry))
+			{
+				//P4 increment
+				int p4LongInt = int.Parse(p4Long.ToString()) - 1;
+
+				if (p4LongInt < 0)
+				{
+					p4Long = '9';
+					p4LongCarry = true;
+				}
+				else
+				{
+					p4Long = p4LongInt.ToString()[0];
+				}
+			}
+			
+			//Check P3
+			bool p3LongCarry = false;
+
+			if (lastPart == 3 || (lastPart > 3 && p4LongCarry))
+			{
+				//P3 increment
+				int p3LongInt = Array.IndexOf(Base24Ax, p3Long) - 1;
+					
+				try
+				{
+					p3Long = Base24Ax[p3LongInt];
+				}
+				catch (IndexOutOfRangeException)
+				{
+					p3Long = Base24Ax[23];
+					p3LongCarry = true;
+				}
+			}
+			
+			//Check P2
+			bool p2LongCarry = false;
+
+			if (lastPart == 2 || (lastPart > 2 && p3LongCarry))
+			{
+				//P2 increment
+				int p2LongInt = int.Parse(p2Long.ToString()) - 1;
+
+				if (p2LongInt < 0)
+				{
+					p2Long = '9';
+					p2LongCarry = true;
+				}
+				else
+				{
+					p2Long = p2LongInt.ToString()[0];
+				}
+			}
+				
+			//P1 carry from P2
+			if (p2LongCarry)
+			{
+				int p1LongInt = Array.IndexOf(Base18Ar, p1Long) - 1;
+					
+				try
+				{
+					p1Long = Base18Ar[p1LongInt];
+				}
+				catch (IndexOutOfRangeException)
+				{
+					p1Long = Base18Ar[17];
+				}
+			}
+			
+			//Concatenate result
+			return $"{p1Long}{p1Lat}{p2Long}{p2Lat}{p3Long}{p3Lat}{p4Long}{p4Lat}{p5Long}{p5Lat}";
+		}
+
+		public static string LocatorShiftRight(string locator)
+		{
+			locator = locator.Trim().ToUpper();
+
+			int lastPart = GetLastLocatorPart(locator);
+			
+			char p1Long = locator[0]; //A-R
+			char p1Lat = locator[1]; //A-R
+			char p2Long = locator[2]; //0-9
+			char p2Lat = locator[3]; //0-9
+			char? p3Long = locator.Length >= 5 ? locator[4] : (char?)null; //A-X
+			char? p3Lat = locator.Length >= 5 ? locator[5] : (char?)null; //A-X
+			char? p4Long = locator.Length >= 7 ? locator[6] : (char?)null; //0-9
+			char? p4Lat =  locator.Length >= 7 ? locator[7] : (char?)null; //0-9
+			char? p5Long = locator.Length >= 9 ? locator[8] : (char?)null; //A-X
+			char? p5Lat = locator.Length >= 9 ? locator[9] : (char?)null; //A-X
+			
+			//Check P5
+			bool p5LongCarry = false;
+			
+			if (lastPart == 5)
+			{
+				//P5 increment
+				int p5LongInt = Array.IndexOf(Base24Ax, p5Long) + 1;
+					
+				try
+				{
+					p5Long = Base24Ax[p5LongInt];
+				}
+				catch (IndexOutOfRangeException)
+				{
+					p5Long = Base24Ax[0];
+					p5LongCarry = true;
+				}
+			}
+			
+			//Check P4
+			bool p4LongCarry = false;
+			
+			if (lastPart == 4 || (lastPart > 4 && p5LongCarry))
+			{
+				//P4 increment
+				int p4LongInt = int.Parse(p4Long.ToString()) + 1;
+
+				if (p4LongInt > 9)
+				{
+					p4Long = '0';
+					p4LongCarry = true;
+				}
+				else
+				{
+					p4Long = p4LongInt.ToString()[0];
+				}
+			}
+			
+			//Check P3
+			bool p3LongCarry = false;
+
+			if (lastPart == 3 || (lastPart > 3 && p4LongCarry))
+			{
+				//P3 increment
+				int p3LongInt = Array.IndexOf(Base24Ax, p3Long) + 1;
+					
+				try
+				{
+					p3Long = Base24Ax[p3LongInt];
+				}
+				catch (IndexOutOfRangeException)
+				{
+					p3Long = Base24Ax[0];
+					p3LongCarry = true;
+				}
+			}
+			
+			//Check P2
+			bool p2LongCarry = false;
+
+			if (lastPart == 2 || (lastPart > 2 && p3LongCarry))
+			{
+				//P2 increment
+				int p2LongInt = int.Parse(p2Long.ToString()) + 1;
+
+				if (p2LongInt > 9)
+				{
+					p2Long = '0';
+					p2LongCarry = true;
+				}
+				else
+				{
+					p2Long = p2LongInt.ToString()[0];
+				}
+			}
+				
+			//P1 carry from P2
+			if (p2LongCarry)
+			{
+				int p1LongInt = Array.IndexOf(Base18Ar, p1Long) + 1;
+					
+				try
+				{
+					p1Long = Base18Ar[p1LongInt];
+				}
+				catch (IndexOutOfRangeException)
+				{
+					p1Long = Base18Ar[0];
+				}
+			}
+			
+			//Concatenate result
+			return $"{p1Long}{p1Lat}{p2Long}{p2Lat}{p3Long}{p3Lat}{p4Long}{p4Lat}{p5Long}{p5Lat}";
+		}
+
+		public static double[][] LocatorToPolygonPoints(string locator)
+		{
+			List<double[]> points = new List<double[]>();
+			
+			//Bottom Left
+			(double lat, double lon) currentPoint = LocatorToLatLng(locator);
+			points.Add(new []{ currentPoint.lat, currentPoint.lon });
+
+			//Top Left
+			currentPoint = LocatorToLatLng(LocatorShiftUp(locator));
+			points.Add(new []{ currentPoint.lat, currentPoint.lon });
+			
+			//Top Right
+			currentPoint = LocatorToLatLng(LocatorShiftLeft(LocatorShiftUp(locator)));
+			points.Add(new []{ currentPoint.lat, currentPoint.lon });
+
+			//Bottom Right
+			currentPoint = LocatorToLatLng(LocatorShiftLeft(locator));
+			points.Add(new []{ currentPoint.lat, currentPoint.lon });
+
+			return points.ToArray();
 		}
 	}
 }
